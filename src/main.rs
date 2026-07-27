@@ -17,6 +17,8 @@ const MOVE_SPEED: f32 = 370.0;
 const ACCEL: f32 = 2600.0;
 const FRICTION: f32 = 2100.0;
 const JUMP_SPEED: f32 = 720.0;
+const APPLE_BANK_VALUE: u32 = 10;
+const POWERUP_COST: u32 = 2;
 const LEVEL_COUNT: usize = 2;
 
 #[derive(Component)]
@@ -35,6 +37,9 @@ struct Platform;
 
 #[derive(Component)]
 struct Collectible;
+
+#[derive(Component)]
+struct Shop;
 
 #[derive(Component)]
 struct Hazard;
@@ -68,6 +73,13 @@ struct Game {
     level: usize,
     lives: i32,
     score: u32,
+    bank_coins: u32,
+    frog_coins: u32,
+    speed_boots: bool,
+    spring_legs: bool,
+    shield_charm: bool,
+    shop_open: bool,
+    shop_message: String,
     checkpoint: Vec3,
     mode: GameMode,
 }
@@ -105,6 +117,7 @@ struct LevelSpec {
     hazards: &'static [RectSpec],
     checkpoint: Vec3,
     goal: Vec3,
+    shop: Vec3,
     width: f32,
 }
 
@@ -184,6 +197,7 @@ const LEVELS: [LevelSpec; LEVEL_COUNT] = [
         ],
         checkpoint: Vec3::new(185.0, -190.0, 10.0),
         goal: Vec3::new(665.0, -180.0, 10.0),
+        shop: Vec3::new(-455.0, -182.0, 10.0),
         width: 1200.0,
     },
     LevelSpec {
@@ -280,6 +294,7 @@ const LEVELS: [LevelSpec; LEVEL_COUNT] = [
         ],
         checkpoint: Vec3::new(310.0, 115.0, 10.0),
         goal: Vec3::new(715.0, -180.0, 10.0),
+        shop: Vec3::new(-570.0, -182.0, 10.0),
         width: 1350.0,
     },
 ];
@@ -291,6 +306,13 @@ fn main() {
             level: 0,
             lives: 3,
             score: 0,
+            bank_coins: 0,
+            frog_coins: 0,
+            speed_boots: false,
+            spring_legs: false,
+            shield_charm: false,
+            shop_open: false,
+            shop_message: "Find the piggy shop. E opens it.".to_string(),
             checkpoint: LEVELS[0].spawn,
             mode: GameMode::Playing,
         })
@@ -320,6 +342,7 @@ fn main() {
                 enemy_ai,
                 resolve_player_platforms.after(apply_velocity),
                 collect_items,
+                shop_interaction,
                 enemy_player_contact,
                 hazard_goal_checkpoint,
                 camera_follow,
@@ -515,6 +538,23 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
     ));
     commands.spawn((
         SpriteBundle {
+            texture: asset_server.load("pixel_adventure/Free/Items/Boxes/Box3/Idle.png"),
+            sprite: Sprite {
+                color: Color::srgb(1.0, 0.88, 0.58),
+                custom_size: Some(Vec2::new(62.0, 52.0)),
+                ..default()
+            },
+            transform: Transform::from_xyz(level.shop.x, level.shop.y, 3.0),
+            ..default()
+        },
+        Shop,
+        Collider {
+            size: Vec2::new(74.0, 70.0),
+        },
+        LevelEntity,
+    ));
+    commands.spawn((
+        SpriteBundle {
             texture: asset_server.load("pixel_adventure/derived/goal.png"),
             sprite: Sprite {
                 color: Color::WHITE,
@@ -562,6 +602,13 @@ fn restart_input(
         game.level = 0;
         game.lives = 3;
         game.score = 0;
+        game.bank_coins = 0;
+        game.frog_coins = 0;
+        game.speed_boots = false;
+        game.spring_legs = false;
+        game.shield_charm = false;
+        game.shop_open = false;
+        game.shop_message = "Find the piggy shop. E opens it.".to_string();
         game.checkpoint = LEVELS[0].spawn;
         game.mode = GameMode::Playing;
         spawn_level(&mut commands, &game, &asset_server);
@@ -584,10 +631,15 @@ fn player_input(
     let dt = time.delta_seconds();
     let left = keys.pressed(KeyCode::ArrowLeft) || keys.pressed(KeyCode::KeyA);
     let right = keys.pressed(KeyCode::ArrowRight) || keys.pressed(KeyCode::KeyD);
-    let target = if left && !right {
-        -MOVE_SPEED
-    } else if right && !left {
+    let move_speed = if game.speed_boots {
+        MOVE_SPEED * 1.25
+    } else {
         MOVE_SPEED
+    };
+    let target = if left && !right {
+        -move_speed
+    } else if right && !left {
+        move_speed
     } else {
         0.0
     };
@@ -606,7 +658,11 @@ fn player_input(
         || keys.just_pressed(KeyCode::ArrowUp)
         || keys.just_pressed(KeyCode::KeyW);
     if grounded && jump_pressed {
-        velocity.y = JUMP_SPEED;
+        velocity.y = if game.spring_legs {
+            JUMP_SPEED * 1.18
+        } else {
+            JUMP_SPEED
+        };
         play("jump");
     }
     if velocity.y > 0.0
@@ -709,8 +765,105 @@ fn collect_items(
         if overlap(pt.translation, pc.size, ct.translation, cc.size).is_some() {
             commands.entity(entity).despawn_recursive();
             game.score += 100;
+            game.bank_coins += APPLE_BANK_VALUE;
+            game.frog_coins += 1;
+            game.shop_message = format!("+{} piggy bank coins, +1 frog coin.", APPLE_BANK_VALUE);
             play("coin");
         }
+    }
+}
+
+fn shop_interaction(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut game: ResMut<Game>,
+    player: Query<(&Transform, &Collider), With<Player>>,
+    shops: Query<(&Transform, &Collider), With<Shop>>,
+) {
+    if game.mode != GameMode::Playing {
+        return;
+    }
+    let Ok((pt, pc)) = player.get_single() else {
+        return;
+    };
+    let near_shop = shops.iter().any(|(st, sc)| {
+        overlap(
+            pt.translation,
+            pc.size + Vec2::splat(34.0),
+            st.translation,
+            sc.size,
+        )
+        .is_some()
+    });
+
+    if !near_shop {
+        if game.shop_open {
+            game.shop_open = false;
+            game.shop_message = "Shop closed. Come back with frog coins.".to_string();
+        }
+        return;
+    }
+
+    if keys.just_pressed(KeyCode::KeyE) || keys.just_pressed(KeyCode::Enter) {
+        game.shop_open = !game.shop_open;
+        game.shop_message = if game.shop_open {
+            "Piggy Shop open: press 1 Speed Boots, 2 Spring Legs, 3 Shield Charm. Each costs 2 frog coins.".to_string()
+        } else {
+            "Piggy Shop closed.".to_string()
+        };
+        play("checkpoint");
+    }
+
+    if !game.shop_open {
+        game.shop_message = "Piggy Shop nearby: press E to open.".to_string();
+        return;
+    }
+
+    let choice = if keys.just_pressed(KeyCode::Digit1) {
+        Some(1)
+    } else if keys.just_pressed(KeyCode::Digit2) {
+        Some(2)
+    } else if keys.just_pressed(KeyCode::Digit3) {
+        Some(3)
+    } else {
+        None
+    };
+
+    if let Some(choice) = choice {
+        if game.frog_coins < POWERUP_COST {
+            game.shop_message = format!(
+                "Need {} frog coins per power-up. Collect more apples.",
+                POWERUP_COST
+            );
+            play("hurt");
+            return;
+        }
+        let already_owned = match choice {
+            1 => game.speed_boots,
+            2 => game.spring_legs,
+            3 => game.shield_charm,
+            _ => false,
+        };
+        if already_owned {
+            game.shop_message = "You already own that power-up.".to_string();
+            return;
+        }
+        game.frog_coins -= POWERUP_COST;
+        match choice {
+            1 => {
+                game.speed_boots = true;
+                game.shop_message = "Bought Speed Boots: move 25% faster.".to_string();
+            }
+            2 => {
+                game.spring_legs = true;
+                game.shop_message = "Bought Spring Legs: jump 18% higher.".to_string();
+            }
+            3 => {
+                game.shield_charm = true;
+                game.shop_message = "Bought Shield Charm: blocks your next hit.".to_string();
+            }
+            _ => {}
+        }
+        play("coin");
     }
 }
 
@@ -797,6 +950,14 @@ fn hazard_goal_checkpoint(
 }
 
 fn damage_player(game: &mut Game, transform: &mut Transform, velocity: &mut Velocity) {
+    if game.shield_charm {
+        game.shield_charm = false;
+        game.shop_message = "Shield Charm blocked the hit.".to_string();
+        transform.translation = game.checkpoint;
+        velocity.0 = Vec2::ZERO;
+        play("checkpoint");
+        return;
+    }
     game.lives -= 1;
     play("hurt");
     if game.lives <= 0 {
@@ -832,12 +993,22 @@ fn update_hud(
     mut banner: Query<&mut Text, (With<Banner>, Without<Hud>)>,
 ) {
     if let Ok(mut text) = hud.get_single_mut() {
+        let owned = format!(
+            "{}{}{}",
+            if game.speed_boots { " SpeedBoots" } else { "" },
+            if game.spring_legs { " SpringLegs" } else { "" },
+            if game.shield_charm { " Shield" } else { "" }
+        );
         text.sections[0].value = format!(
-            "Level {} / {}    Score {}    Lives {}    Move A/D or ←/→    Jump Space/W/↑",
+            "Level {} / {}  Score {}  Lives {}  Piggy Bank {}  Frog Coins {}{}\nMove A/D or ←/→  Jump Space/W/↑  Shop E/Enter then 1/2/3  {}",
             game.level + 1,
             LEVEL_COUNT,
             game.score,
-            game.lives.max(0)
+            game.lives.max(0),
+            game.bank_coins,
+            game.frog_coins,
+            owned,
+            game.shop_message
         );
     }
     if let Ok(mut text) = banner.get_single_mut() {
