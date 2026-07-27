@@ -10,6 +10,7 @@ repository = "https://github.com/Syrexle/rusty-plumber"
 bevy = { version = "0.14", default-features = true, features = ["webgl2"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 uuid = { version = "1", features = ["js"] }
+wasm-bindgen = "0.2"
 
 [profile.dev]
 opt-level = 1

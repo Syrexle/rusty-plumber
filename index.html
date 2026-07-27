@@ -15,6 +15,34 @@
 <body>
   <canvas id="bevy-canvas" width="960" height="540"></canvas>
   <div class="loader">Loading Rusty Plumber…</div>
-  <script>window.addEventListener('load',()=>setTimeout(()=>document.querySelector('.loader')?.remove(),1200));</script>
+  <script>
+    window.azzlePlaySound = (name) => {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = window.__rustyPlumberAudio ??= new AudioContext();
+      if (ctx.state === 'suspended') ctx.resume();
+      const tones = {
+        jump: [520, 0.09, 'square'],
+        coin: [880, 0.08, 'triangle'],
+        hurt: [150, 0.16, 'sawtooth'],
+        checkpoint: [660, 0.18, 'sine'],
+        win: [740, 0.28, 'triangle'],
+        stomp: [260, 0.10, 'square'],
+      };
+      const [freq, duration, type] = tones[name] || [440, 0.08, 'sine'];
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.08, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    };
+    window.addEventListener('load',()=>setTimeout(()=>document.querySelector('.loader')?.remove(),1200));
+  </script>
 </body>
 </html>

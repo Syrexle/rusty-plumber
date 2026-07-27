@@ -1,5 +1,14 @@
-use bevy::audio::{AudioBundle, PlaybackSettings};
 use bevy::prelude::*;
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_name = azzlePlaySound)]
+    fn azzle_play_sound(name: &str);
+}
 use bevy::window::{PresentMode, WindowResolution};
 
 const PLAYER_SIZE: Vec2 = Vec2::new(34.0, 44.0);
@@ -68,16 +77,6 @@ enum GameMode {
     Playing,
     Won,
     Lost,
-}
-
-#[derive(Resource)]
-struct Sounds {
-    jump: Handle<AudioSource>,
-    coin: Handle<AudioSource>,
-    hurt: Handle<AudioSource>,
-    checkpoint: Handle<AudioSource>,
-    win: Handle<AudioSource>,
-    stomp: Handle<AudioSource>,
 }
 
 #[derive(Clone, Copy)]
@@ -330,16 +329,8 @@ fn main() {
         .run();
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>, game: Res<Game>) {
+fn setup(mut commands: Commands, game: Res<Game>) {
     commands.spawn(Camera2dBundle::default());
-    commands.insert_resource(Sounds {
-        jump: asset_server.load("sounds/jump.mp3"),
-        coin: asset_server.load("sounds/coin.mp3"),
-        hurt: asset_server.load("sounds/hurt.mp3"),
-        checkpoint: asset_server.load("sounds/checkpoint.mp3"),
-        win: asset_server.load("sounds/win.mp3"),
-        stomp: asset_server.load("sounds/stomp.mp3"),
-    });
     commands.spawn((
         TextBundle::from_section(
             "",
@@ -570,8 +561,6 @@ fn player_input(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
     game: Res<Game>,
-    sounds: Res<Sounds>,
-    mut commands: Commands,
     mut query: Query<(&mut Velocity, &Transform, &Collider), With<Player>>,
     platforms: Query<(&Transform, &Collider), (With<Platform>, Without<Player>)>,
 ) {
@@ -607,7 +596,7 @@ fn player_input(
         || keys.just_pressed(KeyCode::KeyW);
     if grounded && jump_pressed {
         velocity.y = JUMP_SPEED;
-        play(&mut commands, sounds.jump.clone());
+        play("jump");
     }
     if velocity.y > 0.0
         && !(keys.pressed(KeyCode::Space)
@@ -696,7 +685,6 @@ fn resolve_player_platforms(
 fn collect_items(
     mut commands: Commands,
     mut game: ResMut<Game>,
-    sounds: Res<Sounds>,
     player: Query<(&Transform, &Collider), With<Player>>,
     coins: Query<(Entity, &Transform, &Collider), With<Collectible>>,
 ) {
@@ -710,7 +698,7 @@ fn collect_items(
         if overlap(pt.translation, pc.size, ct.translation, cc.size).is_some() {
             commands.entity(entity).despawn_recursive();
             game.score += 100;
-            play(&mut commands, sounds.coin.clone());
+            play("coin");
         }
     }
 }
@@ -718,7 +706,6 @@ fn collect_items(
 fn enemy_player_contact(
     mut commands: Commands,
     mut game: ResMut<Game>,
-    sounds: Res<Sounds>,
     mut player: Query<(&mut Transform, &mut Velocity, &Collider), With<Player>>,
     enemies: Query<(Entity, &Transform, &Collider), (With<Enemy>, Without<Player>)>,
 ) {
@@ -736,9 +723,9 @@ fn enemy_player_contact(
                 commands.entity(entity).despawn_recursive();
                 pv.y = JUMP_SPEED * 0.62;
                 game.score += 250;
-                play(&mut commands, sounds.stomp.clone());
+                play("stomp");
             } else {
-                damage_player(&mut commands, &mut game, &sounds, &mut pt, &mut pv);
+                damage_player(&mut game, &mut pt, &mut pv);
             }
         }
     }
@@ -747,7 +734,6 @@ fn enemy_player_contact(
 fn hazard_goal_checkpoint(
     mut commands: Commands,
     mut game: ResMut<Game>,
-    sounds: Res<Sounds>,
     level_entities: Query<Entity, With<LevelEntity>>,
     mut player: Query<(&mut Transform, &mut Velocity, &Collider), With<Player>>,
     hazards: Query<(&Transform, &Collider), (With<Hazard>, Without<Player>)>,
@@ -761,12 +747,12 @@ fn hazard_goal_checkpoint(
         return;
     };
     if pt.translation.y < -520.0 {
-        damage_player(&mut commands, &mut game, &sounds, &mut pt, &mut pv);
+        damage_player(&mut game, &mut pt, &mut pv);
         return;
     }
     for (ht, hc) in hazards.iter() {
         if overlap(pt.translation, pc.size, ht.translation, hc.size).is_some() {
-            damage_player(&mut commands, &mut game, &sounds, &mut pt, &mut pv);
+            damage_player(&mut game, &mut pt, &mut pv);
             return;
         }
     }
@@ -776,7 +762,7 @@ fn hazard_goal_checkpoint(
         {
             game.checkpoint = checkpoint.position;
             game.score += 50;
-            play(&mut commands, sounds.checkpoint.clone());
+            play("checkpoint");
         }
     }
     for (gt, gc) in goals.iter() {
@@ -791,22 +777,16 @@ fn hazard_goal_checkpoint(
                 spawn_level(&mut commands, &game);
             } else {
                 game.mode = GameMode::Won;
-                play(&mut commands, sounds.win.clone());
+                play("win");
             }
             return;
         }
     }
 }
 
-fn damage_player(
-    commands: &mut Commands,
-    game: &mut Game,
-    sounds: &Sounds,
-    transform: &mut Transform,
-    velocity: &mut Velocity,
-) {
+fn damage_player(game: &mut Game, transform: &mut Transform, velocity: &mut Velocity) {
     game.lives -= 1;
-    play(commands, sounds.hurt.clone());
+    play("hurt");
     if game.lives <= 0 {
         game.mode = GameMode::Lost;
         velocity.0 = Vec2::ZERO;
@@ -882,9 +862,10 @@ fn overlap(a_pos: Vec3, a_size: Vec2, b_pos: Vec3, b_size: Vec2) -> Option<Vec2>
     Some(Vec2::new(px, py))
 }
 
-fn play(commands: &mut Commands, source: Handle<AudioSource>) {
-    commands.spawn(AudioBundle {
-        source,
-        settings: PlaybackSettings::DESPAWN,
-    });
+fn play(name: &str) {
+    #[cfg(target_arch = "wasm32")]
+    azzle_play_sound(name);
+
+    #[cfg(not(target_arch = "wasm32"))]
+    let _ = name;
 }

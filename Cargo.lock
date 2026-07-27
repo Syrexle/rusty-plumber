@@ -3346,6 +3346,7 @@ dependencies = [
  "bevy",
  "getrandom 0.3.4",
  "uuid",
+ "wasm-bindgen",
 ]
 
 [[package]]
