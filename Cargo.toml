@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Original Super Mario-style Bevy platformer for desktop browsers"
 license = "MIT"
-repository = "https://github.com/tariqbuilds/rusty-plumber"
+repository = "https://github.com/Syrexle/rusty-plumber"
 
 [dependencies]
 bevy = { version = "0.14", default-features = true, features = ["webgl2"] }
