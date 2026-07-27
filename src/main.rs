@@ -71,6 +71,9 @@ struct Banner;
 #[derive(Component)]
 struct ShopUi;
 
+#[derive(Component)]
+struct ShopUiText;
+
 #[derive(Resource)]
 struct Game {
     level: usize,
@@ -394,24 +397,39 @@ fn setup(mut commands: Commands, game: Res<Game>, asset_server: Res<AssetServer>
         }),
         Banner,
     ));
-    commands.spawn((
-        TextBundle::from_section(
-            "",
-            TextStyle {
-                font_size: 22.0,
-                color: Color::srgb(1.0, 0.95, 0.72),
+    commands
+        .spawn((
+            NodeBundle {
+                style: Style {
+                    position_type: PositionType::Absolute,
+                    right: Val::Px(22.0),
+                    top: Val::Px(76.0),
+                    width: Val::Px(460.0),
+                    min_height: Val::Px(270.0),
+                    padding: UiRect::all(Val::Px(16.0)),
+                    border: UiRect::all(Val::Px(4.0)),
+                    ..default()
+                },
+                background_color: BackgroundColor(Color::srgba(0.018, 0.014, 0.045, 0.96)),
+                border_color: BorderColor(Color::srgb(0.72, 0.43, 0.16)),
+                visibility: Visibility::Hidden,
                 ..default()
             },
-        )
-        .with_style(Style {
-            position_type: PositionType::Absolute,
-            right: Val::Px(22.0),
-            top: Val::Px(76.0),
-            padding: UiRect::all(Val::Px(14.0)),
-            ..default()
-        }),
-        ShopUi,
-    ));
+            ShopUi,
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                TextBundle::from_section(
+                    "",
+                    TextStyle {
+                        font_size: 22.0,
+                        color: Color::srgb(1.0, 0.95, 0.72),
+                        ..default()
+                    },
+                ),
+                ShopUiText,
+            ));
+        });
     spawn_level(&mut commands, &game, &asset_server);
 }
 
@@ -1055,15 +1073,24 @@ fn update_hud(
     }
 }
 
-fn update_marketplace_ui(game: Res<Game>, mut shop_ui: Query<&mut Text, With<ShopUi>>) {
-    let Ok(mut text) = shop_ui.get_single_mut() else {
+fn update_marketplace_ui(
+    game: Res<Game>,
+    mut shop_panel: Query<&mut Visibility, With<ShopUi>>,
+    mut shop_text: Query<&mut Text, With<ShopUiText>>,
+) {
+    let Ok(mut visibility) = shop_panel.get_single_mut() else {
+        return;
+    };
+    let Ok(mut text) = shop_text.get_single_mut() else {
         return;
     };
 
     if !game.shop_open {
         text.sections[0].value = String::new();
+        *visibility = Visibility::Hidden;
         return;
     }
+    *visibility = Visibility::Visible;
 
     let items = [
         ("Speed Boots", "Move 25% faster", game.speed_boots),
