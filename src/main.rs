@@ -68,6 +68,9 @@ struct Hud;
 #[derive(Component)]
 struct Banner;
 
+#[derive(Component)]
+struct ShopUi;
+
 #[derive(Resource)]
 struct Game {
     level: usize,
@@ -79,6 +82,7 @@ struct Game {
     spring_legs: bool,
     shield_charm: bool,
     shop_open: bool,
+    shop_selected: usize,
     shop_message: String,
     checkpoint: Vec3,
     mode: GameMode,
@@ -312,6 +316,7 @@ fn main() {
             spring_legs: false,
             shield_charm: false,
             shop_open: false,
+            shop_selected: 0,
             shop_message: "Find the piggy shop. E opens it.".to_string(),
             checkpoint: LEVELS[0].spawn,
             mode: GameMode::Playing,
@@ -347,6 +352,7 @@ fn main() {
                 hazard_goal_checkpoint,
                 camera_follow,
                 update_hud,
+                update_marketplace_ui,
             ),
         )
         .run();
@@ -387,6 +393,24 @@ fn setup(mut commands: Commands, game: Res<Game>, asset_server: Res<AssetServer>
             ..default()
         }),
         Banner,
+    ));
+    commands.spawn((
+        TextBundle::from_section(
+            "",
+            TextStyle {
+                font_size: 22.0,
+                color: Color::srgb(1.0, 0.95, 0.72),
+                ..default()
+            },
+        )
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            right: Val::Px(22.0),
+            top: Val::Px(76.0),
+            padding: UiRect::all(Val::Px(14.0)),
+            ..default()
+        }),
+        ShopUi,
     ));
     spawn_level(&mut commands, &game, &asset_server);
 }
@@ -608,6 +632,7 @@ fn restart_input(
         game.spring_legs = false;
         game.shield_charm = false;
         game.shop_open = false;
+        game.shop_selected = 0;
         game.shop_message = "Find the piggy shop. E opens it.".to_string();
         game.checkpoint = LEVELS[0].spawn;
         game.mode = GameMode::Playing;
@@ -622,7 +647,7 @@ fn player_input(
     mut query: Query<(&mut Velocity, &Transform, &Collider), With<Player>>,
     platforms: Query<(&Transform, &Collider), (With<Platform>, Without<Player>)>,
 ) {
-    if game.mode != GameMode::Playing {
+    if game.mode != GameMode::Playing || game.shop_open {
         return;
     }
     let Ok((mut velocity, transform, collider)) = query.get_single_mut() else {
@@ -788,7 +813,7 @@ fn shop_interaction(
     let near_shop = shops.iter().any(|(st, sc)| {
         overlap(
             pt.translation,
-            pc.size + Vec2::splat(34.0),
+            pc.size + Vec2::splat(160.0),
             st.translation,
             sc.size,
         )
@@ -803,68 +828,79 @@ fn shop_interaction(
         return;
     }
 
-    if keys.just_pressed(KeyCode::KeyE) || keys.just_pressed(KeyCode::Enter) {
-        game.shop_open = !game.shop_open;
-        game.shop_message = if game.shop_open {
-            "Piggy Shop open: press 1 Speed Boots, 2 Spring Legs, 3 Shield Charm. Each costs 2 frog coins.".to_string()
-        } else {
-            "Piggy Shop closed.".to_string()
-        };
-        play("checkpoint");
-    }
-
     if !game.shop_open {
-        game.shop_message = "Piggy Shop nearby: press E to open.".to_string();
+        game.shop_message = "Piggy Marketplace nearby: press E/Enter to open.".to_string();
+        if keys.just_pressed(KeyCode::KeyE) || keys.just_pressed(KeyCode::Enter) {
+            game.shop_open = true;
+            game.shop_selected = 0;
+            game.shop_message = "Welcome to Piggy Marketplace.".to_string();
+            play("checkpoint");
+        }
         return;
     }
 
-    let choice = if keys.just_pressed(KeyCode::Digit1) {
-        Some(1)
-    } else if keys.just_pressed(KeyCode::Digit2) {
-        Some(2)
-    } else if keys.just_pressed(KeyCode::Digit3) {
-        Some(3)
-    } else {
-        None
-    };
-
-    if let Some(choice) = choice {
-        if game.frog_coins < POWERUP_COST {
-            game.shop_message = format!(
-                "Need {} frog coins per power-up. Collect more apples.",
-                POWERUP_COST
-            );
-            play("hurt");
-            return;
-        }
-        let already_owned = match choice {
-            1 => game.speed_boots,
-            2 => game.spring_legs,
-            3 => game.shield_charm,
-            _ => false,
-        };
-        if already_owned {
-            game.shop_message = "You already own that power-up.".to_string();
-            return;
-        }
-        game.frog_coins -= POWERUP_COST;
-        match choice {
-            1 => {
-                game.speed_boots = true;
-                game.shop_message = "Bought Speed Boots: move 25% faster.".to_string();
-            }
-            2 => {
-                game.spring_legs = true;
-                game.shop_message = "Bought Spring Legs: jump 18% higher.".to_string();
-            }
-            3 => {
-                game.shield_charm = true;
-                game.shop_message = "Bought Shield Charm: blocks your next hit.".to_string();
-            }
-            _ => {}
-        }
-        play("coin");
+    if keys.just_pressed(KeyCode::Escape) {
+        game.shop_open = false;
+        game.shop_message = "Piggy Marketplace closed.".to_string();
+        return;
     }
+
+    let up = keys.just_pressed(KeyCode::KeyW) || keys.just_pressed(KeyCode::KeyA);
+    let down = keys.just_pressed(KeyCode::KeyS) || keys.just_pressed(KeyCode::KeyD);
+    if up {
+        game.shop_selected = (game.shop_selected + 2) % 3;
+        play("checkpoint");
+    } else if down {
+        game.shop_selected = (game.shop_selected + 1) % 3;
+        play("checkpoint");
+    }
+
+    if keys.just_pressed(KeyCode::KeyE)
+        || keys.just_pressed(KeyCode::Enter)
+        || keys.just_pressed(KeyCode::Space)
+    {
+        buy_selected_powerup(&mut game);
+    }
+}
+
+fn buy_selected_powerup(game: &mut Game) {
+    if game.frog_coins < POWERUP_COST {
+        game.shop_message = format!(
+            "Need {} frog coins per power-up. Collect more apples.",
+            POWERUP_COST
+        );
+        play("hurt");
+        return;
+    }
+
+    let already_owned = match game.shop_selected {
+        0 => game.speed_boots,
+        1 => game.spring_legs,
+        2 => game.shield_charm,
+        _ => false,
+    };
+    if already_owned {
+        game.shop_message = "Already owned. Scroll to another shelf item.".to_string();
+        return;
+    }
+
+    game.frog_coins -= POWERUP_COST;
+    match game.shop_selected {
+        0 => {
+            game.speed_boots = true;
+            game.shop_message = "Bought Speed Boots: move 25% faster.".to_string();
+        }
+        1 => {
+            game.spring_legs = true;
+            game.shop_message = "Bought Spring Legs: jump 18% higher.".to_string();
+        }
+        2 => {
+            game.shield_charm = true;
+            game.shop_message = "Bought Shield Charm: blocks your next hit.".to_string();
+        }
+        _ => {}
+    }
+    play("coin");
 }
 
 fn enemy_player_contact(
@@ -1000,15 +1036,14 @@ fn update_hud(
             if game.shield_charm { " Shield" } else { "" }
         );
         text.sections[0].value = format!(
-            "Level {} / {}  Score {}  Lives {}  Piggy Bank {}  Frog Coins {}{}\nMove A/D or ←/→  Jump Space/W/↑  Shop E/Enter then 1/2/3  {}",
+            "Level {} / {}  Score {}  Lives {}  Piggy Bank {}  Frog Coins {}{}\nMove A/D or ←/→  Jump Space/W/↑  Shop E/Enter",
             game.level + 1,
             LEVEL_COUNT,
             game.score,
             game.lives.max(0),
             game.bank_coins,
             game.frog_coins,
-            owned,
-            game.shop_message
+            owned
         );
     }
     if let Ok(mut text) = banner.get_single_mut() {
@@ -1018,6 +1053,48 @@ fn update_hud(
             GameMode::Lost => "GAME OVER   Press R to restart".to_string(),
         };
     }
+}
+
+fn update_marketplace_ui(game: Res<Game>, mut shop_ui: Query<&mut Text, With<ShopUi>>) {
+    let Ok(mut text) = shop_ui.get_single_mut() else {
+        return;
+    };
+
+    if !game.shop_open {
+        text.sections[0].value = String::new();
+        return;
+    }
+
+    let items = [
+        ("Speed Boots", "Move 25% faster", game.speed_boots),
+        ("Spring Legs", "Jump 18% higher", game.spring_legs),
+        ("Shield Charm", "Block next hit", game.shield_charm),
+    ];
+
+    let mut rows = String::new();
+    for (i, (name, desc, owned)) in items.iter().enumerate() {
+        let cursor = if i == game.shop_selected { ">" } else { " " };
+        let status = if *owned { "OWNED" } else { "2 Frog" };
+        rows.push_str(&format!(
+            "{} {:<13} {:<15} [{}]\n",
+            cursor, name, desc, status
+        ));
+    }
+
+    text.sections[0].value = format!(
+        "┌──────────────────────────────┐\n\
+         │  🐷 PIGGY MARKETPLACE      │\n\
+         ├──────────────────────────────┤\n\
+         │ Frog Coins: {:<3} Bank: {:<4} │\n\
+         │                              │\n\
+         {}\
+         ├──────────────────────────────┤\n\
+         │ Scroll: W/S or A/D           │\n\
+         │ Buy: E/Enter/Space  Esc: out │\n\
+         │ {}\n\
+         └──────────────────────────────┘",
+        game.frog_coins, game.bank_coins, rows, game.shop_message
+    );
 }
 
 fn is_grounded(
