@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#15182e" />
+  <title>Rusty Plumber</title>
+  <link data-trunk rel="copy-dir" href="assets" />
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #15182e; font-family: system-ui, sans-serif; }
+    canvas { display: block; width: 100vw !important; height: 100vh !important; image-rendering: pixelated; }
+    .loader { position: fixed; inset: 0; display: grid; place-items: center; color: #fff1a6; letter-spacing: .08em; background: radial-gradient(circle at 50% 35%, #28356b, #15182e 60%); }
+  </style>
+</head>
+<body>
+  <canvas id="bevy-canvas" width="960" height="540"></canvas>
+  <div class="loader">Loading Rusty Plumber…</div>
+  <script>window.addEventListener('load',()=>setTimeout(()=>document.querySelector('.loader')?.remove(),1200));</script>
+</body>
+</html>

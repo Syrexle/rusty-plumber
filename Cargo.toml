@@ -1,0 +1,24 @@
+[package]
+name = "rusty_plumber"
+version = "0.1.0"
+edition = "2021"
+description = "Original Super Mario-style Bevy platformer for desktop browsers"
+license = "MIT"
+repository = "https://github.com/tariqbuilds/rusty-plumber"
+
+[dependencies]
+bevy = { version = "0.14", default-features = true, features = ["webgl2"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+uuid = { version = "1", features = ["js"] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+opt-level = "z"
+lto = "thin"
+codegen-units = 1
+strip = true
