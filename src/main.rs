@@ -18,6 +18,7 @@ const ACCEL: f32 = 2600.0;
 const FRICTION: f32 = 2100.0;
 const JUMP_SPEED: f32 = 720.0;
 const APPLE_BANK_VALUE: u32 = 10;
+const STOMP_FROG_COIN_REWARD: u32 = 5;
 const POWERUP_COST: u32 = 2;
 const LEVEL_COUNT: usize = 2;
 
@@ -57,6 +58,13 @@ struct Enemy {
     left: f32,
     right: f32,
     speed: f32,
+}
+
+#[derive(Component)]
+struct AppleRain {
+    speed: f32,
+    sway: f32,
+    start_x: f32,
 }
 
 #[derive(Component)]
@@ -174,6 +182,13 @@ const LEVELS: [LevelSpec; LEVEL_COUNT] = [
         ],
         enemies: &[
             EnemySpec {
+                x: -260.0,
+                y: -205.0,
+                left: -315.0,
+                right: -170.0,
+                speed: 75.0,
+            },
+            EnemySpec {
                 x: 30.0,
                 y: -205.0,
                 left: -105.0,
@@ -186,6 +201,20 @@ const LEVELS: [LevelSpec; LEVEL_COUNT] = [
                 left: 290.0,
                 right: 520.0,
                 speed: 130.0,
+            },
+            EnemySpec {
+                x: -220.0,
+                y: -70.0,
+                left: -290.0,
+                right: -165.0,
+                speed: 85.0,
+            },
+            EnemySpec {
+                x: 485.0,
+                y: 125.0,
+                left: 430.0,
+                right: 545.0,
+                speed: 75.0,
             },
         ],
         hazards: &[
@@ -264,6 +293,13 @@ const LEVELS: [LevelSpec; LEVEL_COUNT] = [
         ],
         enemies: &[
             EnemySpec {
+                x: -360.0,
+                y: -205.0,
+                left: -460.0,
+                right: -245.0,
+                speed: 82.0,
+            },
+            EnemySpec {
                 x: -130.0,
                 y: -205.0,
                 left: -330.0,
@@ -283,6 +319,20 @@ const LEVELS: [LevelSpec; LEVEL_COUNT] = [
                 left: 35.0,
                 right: 155.0,
                 speed: 70.0,
+            },
+            EnemySpec {
+                x: -445.0,
+                y: -25.0,
+                left: -505.0,
+                right: -385.0,
+                speed: 75.0,
+            },
+            EnemySpec {
+                x: 565.0,
+                y: 20.0,
+                left: 505.0,
+                right: 625.0,
+                speed: 88.0,
             },
         ],
         hazards: &[
@@ -353,6 +403,7 @@ fn main() {
                 shop_interaction,
                 enemy_player_contact,
                 hazard_goal_checkpoint,
+                animate_apple_rain,
                 camera_follow,
                 update_hud,
                 update_marketplace_ui,
@@ -435,9 +486,14 @@ fn setup(mut commands: Commands, game: Res<Game>, asset_server: Res<AssetServer>
 
 fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer) {
     let level = LEVELS[game.level];
+    let party_background = if game.level % 2 == 0 {
+        "pixel_adventure/Free/Background/Pink.png"
+    } else {
+        "pixel_adventure/Free/Background/Purple.png"
+    };
     commands.spawn((
         SpriteBundle {
-            texture: asset_server.load("pixel_adventure/derived/background_blue.png"),
+            texture: asset_server.load(party_background),
             sprite: Sprite {
                 color: Color::WHITE,
                 custom_size: Some(Vec2::new(level.width + 500.0, 900.0)),
@@ -465,6 +521,8 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
             LevelEntity,
         ));
     }
+    spawn_party_decor(commands, level, asset_server);
+    spawn_apple_rain(commands, level, asset_server);
     for p in level.platforms {
         commands.spawn((
             SpriteBundle {
@@ -519,7 +577,7 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
     for (x, y) in level.coins {
         commands.spawn((
             SpriteBundle {
-                texture: asset_server.load("pixel_adventure/derived/fruit.png"),
+                texture: asset_server.load("pixel_adventure/derived/apple.png"),
                 sprite: Sprite {
                     color: Color::WHITE,
                     custom_size: Some(Vec2::new(28.0, 28.0)),
@@ -535,13 +593,17 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
             LevelEntity,
         ));
     }
-    for e in level.enemies {
+    for (i, e) in level.enemies.iter().enumerate() {
         commands.spawn((
             SpriteBundle {
                 texture: asset_server.load("pixel_adventure/derived/enemy_rock.png"),
                 sprite: Sprite {
-                    color: Color::WHITE,
-                    custom_size: Some(Vec2::new(42.0, 42.0)),
+                    color: if i % 2 == 0 {
+                        Color::srgb(1.0, 0.86, 0.2)
+                    } else {
+                        Color::srgb(0.45, 1.0, 0.62)
+                    },
+                    custom_size: Some(Vec2::new(48.0, 48.0)),
                     ..default()
                 },
                 transform: Transform::from_xyz(e.x, e.y, 5.0),
@@ -628,6 +690,77 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
         Collider { size: PLAYER_SIZE },
         LevelEntity,
     ));
+}
+
+fn spawn_party_decor(commands: &mut Commands, level: LevelSpec, asset_server: &AssetServer) {
+    let party_colors = [
+        Color::srgb(1.0, 0.35, 0.68),
+        Color::srgb(1.0, 0.9, 0.25),
+        Color::srgb(0.34, 1.0, 0.7),
+        Color::srgb(0.35, 0.78, 1.0),
+        Color::srgb(0.92, 0.52, 1.0),
+    ];
+
+    for i in 0..26 {
+        let x = -level.width / 2.0 + 35.0 + i as f32 * 58.0;
+        let y = 242.0 - (i % 2) as f32 * 22.0;
+        commands.spawn((
+            SpriteBundle {
+                texture: asset_server.load("pixel_adventure/derived/confetti.png"),
+                sprite: Sprite {
+                    color: party_colors[i % party_colors.len()],
+                    custom_size: Some(Vec2::new(34.0, 34.0)),
+                    ..default()
+                },
+                transform: Transform::from_xyz(x, y, -12.0),
+                ..default()
+            },
+            LevelEntity,
+        ));
+    }
+
+    for i in 0..12 {
+        let x = -level.width / 2.0 + 80.0 + i as f32 * 115.0;
+        commands.spawn((
+            SpriteBundle {
+                texture: asset_server.load("pixel_adventure/derived/apple.png"),
+                sprite: Sprite {
+                    color: party_colors[(i + 2) % party_colors.len()],
+                    custom_size: Some(Vec2::new(24.0, 24.0)),
+                    ..default()
+                },
+                transform: Transform::from_xyz(x, 205.0 + (i % 3) as f32 * 17.0, -11.0),
+                ..default()
+            },
+            LevelEntity,
+        ));
+    }
+}
+
+fn spawn_apple_rain(commands: &mut Commands, level: LevelSpec, asset_server: &AssetServer) {
+    for i in 0..48 {
+        let x = -level.width / 2.0 + 25.0 + (i as f32 * 73.0) % (level.width + 220.0) - 110.0;
+        let y = 300.0 - (i as f32 * 37.0) % 640.0;
+        let size = 22.0 + (i % 3) as f32 * 4.0;
+        commands.spawn((
+            SpriteBundle {
+                texture: asset_server.load("pixel_adventure/derived/apple.png"),
+                sprite: Sprite {
+                    color: Color::WHITE,
+                    custom_size: Some(Vec2::new(size, size)),
+                    ..default()
+                },
+                transform: Transform::from_xyz(x, y, -8.0),
+                ..default()
+            },
+            AppleRain {
+                speed: 95.0 + (i % 7) as f32 * 17.0,
+                sway: 10.0 + (i % 5) as f32 * 4.0,
+                start_x: x,
+            },
+            LevelEntity,
+        ));
+    }
 }
 
 fn restart_input(
@@ -754,6 +887,31 @@ fn enemy_ai(
         transform.scale.x = velocity.x.signum().max(0.1);
         velocity.y = 0.0;
         transform.translation.y += (time.elapsed_seconds() * 8.0 + enemy.left).sin() * 0.02;
+    }
+}
+
+fn animate_apple_rain(
+    time: Res<Time>,
+    game: Res<Game>,
+    mut apples: Query<(&mut Transform, &AppleRain)>,
+) {
+    if game.mode != GameMode::Playing {
+        return;
+    }
+
+    let level = LEVELS[game.level];
+    let dt = time.delta_seconds();
+    let pulse = time.elapsed_seconds();
+    for (mut transform, apple) in apples.iter_mut() {
+        transform.translation.y -= apple.speed * dt;
+        transform.translation.x =
+            apple.start_x + (pulse * 2.8 + apple.start_x * 0.03).sin() * apple.sway;
+        transform.rotate_z(dt * 1.8);
+        if transform.translation.y < -350.0 {
+            transform.translation.y = 315.0;
+            transform.translation.x = (transform.translation.x + 137.0)
+                .clamp(-level.width / 2.0 - 120.0, level.width / 2.0 + 120.0);
+        }
     }
 }
 
@@ -941,6 +1099,8 @@ fn enemy_player_contact(
                 commands.entity(entity).despawn_recursive();
                 pv.y = JUMP_SPEED * 0.62;
                 game.score += 250;
+                game.frog_coins += STOMP_FROG_COIN_REWARD;
+                game.shop_message = format!("Party stomp! +{} frog coins.", STOMP_FROG_COIN_REWARD);
                 play("stomp");
             } else {
                 damage_player(&mut game, &mut pt, &mut pv);
@@ -1054,7 +1214,7 @@ fn update_hud(
             if game.shield_charm { " Shield" } else { "" }
         );
         text.sections[0].value = format!(
-            "Level {} / {}  Score {}  Lives {}  Piggy Bank {}  Frog Coins {}{}\nMove A/D or ←/→  Jump Space/W/↑  Shop E/Enter",
+            "Level {} / {}  Score {}  Lives {}  Piggy Bank {}  Frog Coins {}{}\nMove A/D or ←/→  Jump Space/W/↑  Stomp mobs +5 Frog  Shop E/Enter",
             game.level + 1,
             LEVEL_COUNT,
             game.score,
