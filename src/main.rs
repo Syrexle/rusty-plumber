@@ -329,7 +329,7 @@ fn main() {
         .run();
 }
 
-fn setup(mut commands: Commands, game: Res<Game>) {
+fn setup(mut commands: Commands, game: Res<Game>, asset_server: Res<AssetServer>) {
     commands.spawn(Camera2dBundle::default());
     commands.spawn((
         TextBundle::from_section(
@@ -365,15 +365,16 @@ fn setup(mut commands: Commands, game: Res<Game>) {
         }),
         Banner,
     ));
-    spawn_level(&mut commands, &game);
+    spawn_level(&mut commands, &game, &asset_server);
 }
 
-fn spawn_level(commands: &mut Commands, game: &Game) {
+fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer) {
     let level = LEVELS[game.level];
     commands.spawn((
         SpriteBundle {
+            texture: asset_server.load("pixel_adventure/derived/background_blue.png"),
             sprite: Sprite {
-                color: Color::srgb(0.21, 0.38, 0.76),
+                color: Color::WHITE,
                 custom_size: Some(Vec2::new(level.width + 500.0, 900.0)),
                 ..default()
             },
@@ -387,6 +388,7 @@ fn spawn_level(commands: &mut Commands, game: &Game) {
         let y = 185.0 + (i % 3) as f32 * 25.0;
         commands.spawn((
             SpriteBundle {
+                texture: asset_server.load("pixel_adventure/Free/Other/Dust Particle.png"),
                 sprite: Sprite {
                     color: Color::srgba(1.0, 1.0, 1.0, 0.35),
                     custom_size: Some(Vec2::new(58.0, 18.0)),
@@ -401,8 +403,9 @@ fn spawn_level(commands: &mut Commands, game: &Game) {
     for p in level.platforms {
         commands.spawn((
             SpriteBundle {
+                texture: asset_server.load("pixel_adventure/derived/terrain_tile.png"),
                 sprite: Sprite {
-                    color: Color::srgb(0.38, 0.23, 0.12),
+                    color: Color::WHITE,
                     custom_size: Some(Vec2::new(p.w, p.h)),
                     ..default()
                 },
@@ -417,8 +420,9 @@ fn spawn_level(commands: &mut Commands, game: &Game) {
         ));
         commands.spawn((
             SpriteBundle {
+                texture: asset_server.load("pixel_adventure/derived/terrain_grass.png"),
                 sprite: Sprite {
-                    color: Color::srgb(0.18, 0.62, 0.23),
+                    color: Color::WHITE,
                     custom_size: Some(Vec2::new(p.w, 10.0)),
                     ..default()
                 },
@@ -431,8 +435,9 @@ fn spawn_level(commands: &mut Commands, game: &Game) {
     for h in level.hazards {
         commands.spawn((
             SpriteBundle {
+                texture: asset_server.load("pixel_adventure/derived/hazard_spike.png"),
                 sprite: Sprite {
-                    color: Color::srgb(0.94, 0.16, 0.13),
+                    color: Color::WHITE,
                     custom_size: Some(Vec2::new(h.w, h.h)),
                     ..default()
                 },
@@ -449,9 +454,10 @@ fn spawn_level(commands: &mut Commands, game: &Game) {
     for (x, y) in level.coins {
         commands.spawn((
             SpriteBundle {
+                texture: asset_server.load("pixel_adventure/derived/fruit.png"),
                 sprite: Sprite {
-                    color: Color::srgb(1.0, 0.8, 0.1),
-                    custom_size: Some(Vec2::new(22.0, 22.0)),
+                    color: Color::WHITE,
+                    custom_size: Some(Vec2::new(28.0, 28.0)),
                     ..default()
                 },
                 transform: Transform::from_xyz(*x, *y, 4.0),
@@ -467,9 +473,10 @@ fn spawn_level(commands: &mut Commands, game: &Game) {
     for e in level.enemies {
         commands.spawn((
             SpriteBundle {
+                texture: asset_server.load("pixel_adventure/derived/enemy_rock.png"),
                 sprite: Sprite {
-                    color: Color::srgb(0.55, 0.18, 0.68),
-                    custom_size: Some(Vec2::new(34.0, 34.0)),
+                    color: Color::WHITE,
+                    custom_size: Some(Vec2::new(42.0, 42.0)),
                     ..default()
                 },
                 transform: Transform::from_xyz(e.x, e.y, 5.0),
@@ -489,9 +496,10 @@ fn spawn_level(commands: &mut Commands, game: &Game) {
     }
     commands.spawn((
         SpriteBundle {
+            texture: asset_server.load("pixel_adventure/derived/checkpoint.png"),
             sprite: Sprite {
-                color: Color::srgb(0.2, 0.95, 0.85),
-                custom_size: Some(Vec2::new(18.0, 95.0)),
+                color: Color::WHITE,
+                custom_size: Some(Vec2::new(46.0, 82.0)),
                 ..default()
             },
             transform: Transform::from_xyz(level.checkpoint.x, level.checkpoint.y, 3.0),
@@ -507,9 +515,10 @@ fn spawn_level(commands: &mut Commands, game: &Game) {
     ));
     commands.spawn((
         SpriteBundle {
+            texture: asset_server.load("pixel_adventure/derived/goal.png"),
             sprite: Sprite {
-                color: Color::srgb(1.0, 0.66, 0.2),
-                custom_size: Some(Vec2::new(42.0, 115.0)),
+                color: Color::WHITE,
+                custom_size: Some(Vec2::new(64.0, 96.0)),
                 ..default()
             },
             transform: Transform::from_xyz(level.goal.x, level.goal.y, 3.0),
@@ -523,8 +532,9 @@ fn spawn_level(commands: &mut Commands, game: &Game) {
     ));
     commands.spawn((
         SpriteBundle {
+            texture: asset_server.load("pixel_adventure/derived/player_idle.png"),
             sprite: Sprite {
-                color: Color::srgb(0.88, 0.12, 0.12),
+                color: Color::WHITE,
                 custom_size: Some(PLAYER_SIZE),
                 ..default()
             },
@@ -542,6 +552,7 @@ fn restart_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut commands: Commands,
     mut game: ResMut<Game>,
+    asset_server: Res<AssetServer>,
     entities: Query<Entity, With<LevelEntity>>,
 ) {
     if keys.just_pressed(KeyCode::KeyR) && game.mode != GameMode::Playing {
@@ -553,7 +564,7 @@ fn restart_input(
         game.score = 0;
         game.checkpoint = LEVELS[0].spawn;
         game.mode = GameMode::Playing;
-        spawn_level(&mut commands, &game);
+        spawn_level(&mut commands, &game, &asset_server);
     }
 }
 
@@ -734,6 +745,7 @@ fn enemy_player_contact(
 fn hazard_goal_checkpoint(
     mut commands: Commands,
     mut game: ResMut<Game>,
+    asset_server: Res<AssetServer>,
     level_entities: Query<Entity, With<LevelEntity>>,
     mut player: Query<(&mut Transform, &mut Velocity, &Collider), With<Player>>,
     hazards: Query<(&Transform, &Collider), (With<Hazard>, Without<Player>)>,
@@ -774,7 +786,7 @@ fn hazard_goal_checkpoint(
                 }
                 game.level += 1;
                 game.checkpoint = LEVELS[game.level].spawn;
-                spawn_level(&mut commands, &game);
+                spawn_level(&mut commands, &game, &asset_server);
             } else {
                 game.mode = GameMode::Won;
                 play("win");

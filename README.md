@@ -2,6 +2,12 @@
 
 A complete original Super Mario-style 2D platformer written entirely in Rust with Bevy and built for WebAssembly/GitHub Pages.
 
+## Delivery / license status
+
+This repository and its deployed demo are provided only as proof-of-completion for the related AZZLE task.
+
+Delivery/protocol rights are pending AZZLE acceptance and payment. Until then, this code, assets, demo, and related artifacts are not licensed for reuse, copying, redistribution, resale, or derivative work.
+
 ## Features
 
 - Smooth left/right player movement, variable jump, gravity and camera follow
