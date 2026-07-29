@@ -87,6 +87,8 @@ struct Game {
     level: usize,
     lives: i32,
     score: u32,
+    collectibles_total: usize,
+    collectibles_remaining: usize,
     bank_coins: u32,
     frog_coins: u32,
     speed_boots: bool,
@@ -363,6 +365,8 @@ fn main() {
             level: 0,
             lives: 3,
             score: 0,
+            collectibles_total: LEVELS[0].coins.len(),
+            collectibles_remaining: LEVELS[0].coins.len(),
             bank_coins: 0,
             frog_coins: 0,
             speed_boots: false,
@@ -777,6 +781,8 @@ fn restart_input(
         game.level = 0;
         game.lives = 3;
         game.score = 0;
+        game.collectibles_total = LEVELS[0].coins.len();
+        game.collectibles_remaining = LEVELS[0].coins.len();
         game.bank_coins = 0;
         game.frog_coins = 0;
         game.speed_boots = false;
@@ -870,12 +876,12 @@ fn apply_velocity(
 fn enemy_ai(
     time: Res<Time>,
     game: Res<Game>,
-    mut query: Query<(&mut Transform, &mut Velocity, &Enemy)>,
+    mut query: Query<(&mut Transform, &mut Sprite, &mut Velocity, &Enemy)>,
 ) {
     if game.mode != GameMode::Playing {
         return;
     }
-    for (mut transform, mut velocity, enemy) in query.iter_mut() {
+    for (mut transform, mut sprite, mut velocity, enemy) in query.iter_mut() {
         if transform.translation.x < enemy.left {
             transform.translation.x = enemy.left;
             velocity.x = enemy.speed.abs();
@@ -884,7 +890,8 @@ fn enemy_ai(
             transform.translation.x = enemy.right;
             velocity.x = -enemy.speed.abs();
         }
-        transform.scale.x = velocity.x.signum().max(0.1);
+        sprite.flip_x = velocity.x < 0.0;
+        transform.scale.x = 1.0;
         velocity.y = 0.0;
         transform.translation.y += (time.elapsed_seconds() * 8.0 + enemy.left).sin() * 0.02;
     }
@@ -966,6 +973,7 @@ fn collect_items(
         if overlap(pt.translation, pc.size, ct.translation, cc.size).is_some() {
             commands.entity(entity).despawn_recursive();
             game.score += 100;
+            game.collectibles_remaining = game.collectibles_remaining.saturating_sub(1);
             game.bank_coins += APPLE_BANK_VALUE;
             game.frog_coins += 1;
             game.shop_message = format!("+{} piggy bank coins, +1 frog coin.", APPLE_BANK_VALUE);
@@ -1152,6 +1160,8 @@ fn hazard_goal_checkpoint(
                     commands.entity(e).despawn_recursive();
                 }
                 game.level += 1;
+                game.collectibles_total = LEVELS[game.level].coins.len();
+                game.collectibles_remaining = LEVELS[game.level].coins.len();
                 game.checkpoint = LEVELS[game.level].spawn;
                 spawn_level(&mut commands, &game, &asset_server);
             } else {
@@ -1214,11 +1224,13 @@ fn update_hud(
             if game.shield_charm { " Shield" } else { "" }
         );
         text.sections[0].value = format!(
-            "Level {} / {}  Score {}  Lives {}  Piggy Bank {}  Frog Coins {}{}\nMove A/D or ←/→  Jump Space/W/↑  Stomp mobs +5 Frog  Shop E/Enter",
+            "Level {} / {}  Score {}  Lives {}  Apples {}/{}  Piggy Bank {}  Frog Coins {}{}\nMove A/D or ←/→  Jump Space/W/↑  Stomp mobs +5 Frog  Shop E/Enter",
             game.level + 1,
             LEVEL_COUNT,
             game.score,
             game.lives.max(0),
+            game.collectibles_total.saturating_sub(game.collectibles_remaining),
+            game.collectibles_total,
             game.bank_coins,
             game.frog_coins,
             owned
