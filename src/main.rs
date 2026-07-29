@@ -487,9 +487,9 @@ fn setup(mut commands: Commands, game: Res<Game>, asset_server: Res<AssetServer>
 fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer) {
     let level = LEVELS[game.level];
     let party_background = if game.level % 2 == 0 {
-        "pixel_adventure/Free/Background/Pink.png"
+        "original/background.png"
     } else {
-        "pixel_adventure/Free/Background/Purple.png"
+        "original/background.png"
     };
     commands.spawn((
         SpriteBundle {
@@ -509,7 +509,7 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
         let y = 185.0 + (i % 3) as f32 * 25.0;
         commands.spawn((
             SpriteBundle {
-                texture: asset_server.load("pixel_adventure/Free/Other/Dust Particle.png"),
+                texture: asset_server.load("original/dust.png"),
                 sprite: Sprite {
                     color: Color::srgba(1.0, 1.0, 1.0, 0.35),
                     custom_size: Some(Vec2::new(58.0, 18.0)),
@@ -526,7 +526,7 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
     for p in level.platforms {
         commands.spawn((
             SpriteBundle {
-                texture: asset_server.load("pixel_adventure/derived/terrain_tile.png"),
+                texture: asset_server.load("original/terrain_tile.png"),
                 sprite: Sprite {
                     color: Color::WHITE,
                     custom_size: Some(Vec2::new(p.w, p.h)),
@@ -543,7 +543,7 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
         ));
         commands.spawn((
             SpriteBundle {
-                texture: asset_server.load("pixel_adventure/derived/terrain_grass.png"),
+                texture: asset_server.load("original/terrain_grass.png"),
                 sprite: Sprite {
                     color: Color::WHITE,
                     custom_size: Some(Vec2::new(p.w, 10.0)),
@@ -558,7 +558,7 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
     for h in level.hazards {
         commands.spawn((
             SpriteBundle {
-                texture: asset_server.load("pixel_adventure/derived/hazard_spike.png"),
+                texture: asset_server.load("original/hazard_spike.png"),
                 sprite: Sprite {
                     color: Color::WHITE,
                     custom_size: Some(Vec2::new(h.w, h.h)),
@@ -577,7 +577,7 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
     for (x, y) in level.coins {
         commands.spawn((
             SpriteBundle {
-                texture: asset_server.load("pixel_adventure/derived/apple.png"),
+                texture: asset_server.load("original/apple.png"),
                 sprite: Sprite {
                     color: Color::WHITE,
                     custom_size: Some(Vec2::new(28.0, 28.0)),
@@ -596,7 +596,7 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
     for (i, e) in level.enemies.iter().enumerate() {
         commands.spawn((
             SpriteBundle {
-                texture: asset_server.load("pixel_adventure/derived/enemy_rock.png"),
+                texture: asset_server.load("original/enemy_rock.png"),
                 sprite: Sprite {
                     color: if i % 2 == 0 {
                         Color::srgb(1.0, 0.86, 0.2)
@@ -623,7 +623,7 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
     }
     commands.spawn((
         SpriteBundle {
-            texture: asset_server.load("pixel_adventure/derived/checkpoint.png"),
+            texture: asset_server.load("original/checkpoint.png"),
             sprite: Sprite {
                 color: Color::WHITE,
                 custom_size: Some(Vec2::new(46.0, 82.0)),
@@ -642,7 +642,7 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
     ));
     commands.spawn((
         SpriteBundle {
-            texture: asset_server.load("pixel_adventure/Free/Items/Boxes/Box3/Idle.png"),
+            texture: asset_server.load("original/shop.png"),
             sprite: Sprite {
                 color: Color::srgb(1.0, 0.88, 0.58),
                 custom_size: Some(Vec2::new(62.0, 52.0)),
@@ -659,7 +659,7 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
     ));
     commands.spawn((
         SpriteBundle {
-            texture: asset_server.load("pixel_adventure/derived/goal.png"),
+            texture: asset_server.load("original/goal.png"),
             sprite: Sprite {
                 color: Color::WHITE,
                 custom_size: Some(Vec2::new(64.0, 96.0)),
@@ -676,7 +676,7 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
     ));
     commands.spawn((
         SpriteBundle {
-            texture: asset_server.load("pixel_adventure/derived/player_idle.png"),
+            texture: asset_server.load("original/player_idle.png"),
             sprite: Sprite {
                 color: Color::WHITE,
                 custom_size: Some(PLAYER_SIZE),
@@ -706,7 +706,7 @@ fn spawn_party_decor(commands: &mut Commands, level: LevelSpec, asset_server: &A
         let y = 242.0 - (i % 2) as f32 * 22.0;
         commands.spawn((
             SpriteBundle {
-                texture: asset_server.load("pixel_adventure/derived/confetti.png"),
+                texture: asset_server.load("original/confetti.png"),
                 sprite: Sprite {
                     color: party_colors[i % party_colors.len()],
                     custom_size: Some(Vec2::new(34.0, 34.0)),
@@ -723,7 +723,7 @@ fn spawn_party_decor(commands: &mut Commands, level: LevelSpec, asset_server: &A
         let x = -level.width / 2.0 + 80.0 + i as f32 * 115.0;
         commands.spawn((
             SpriteBundle {
-                texture: asset_server.load("pixel_adventure/derived/apple.png"),
+                texture: asset_server.load("original/apple.png"),
                 sprite: Sprite {
                     color: party_colors[(i + 2) % party_colors.len()],
                     custom_size: Some(Vec2::new(24.0, 24.0)),
@@ -744,7 +744,7 @@ fn spawn_apple_rain(commands: &mut Commands, level: LevelSpec, asset_server: &As
         let size = 22.0 + (i % 3) as f32 * 4.0;
         commands.spawn((
             SpriteBundle {
-                texture: asset_server.load("pixel_adventure/derived/apple.png"),
+                texture: asset_server.load("original/apple.png"),
                 sprite: Sprite {
                     color: Color::WHITE,
                     custom_size: Some(Vec2::new(size, size)),

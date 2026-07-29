@@ -14,8 +14,12 @@ Delivery/protocol rights are pending AZZLE acceptance and payment. Until then, t
 - Tile-like platform collision, moving enemies with simple patrol AI, hazards and stomp defeats
 - Collectibles, score, lives, HUD, checkpoints, multiple levels, win/loss states
 - Keyboard controls and responsive browser canvas
-- Original procedural rectangle art and generated sound effects only
+- Original generated pixel art in `assets/original/` and browser-native generated sound effects only
 - GitHub Actions workflow that compiles WASM and deploys to Pages
+
+## Original asset generation
+
+All gameplay sprites are generated locally by `scripts/generate_original_assets.py` and written to `assets/original/`. The browser sound effects are generated at runtime with WebAudio oscillators in `index.html`, so there are no third-party gameplay art or audio dependencies.
 
 ## Controls
 

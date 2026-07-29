@@ -2,7 +2,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "dist" / "assets" / "pixel_adventure" / "Free"
+ASSETS = ROOT / "assets" / "original"
 OUT = ROOT / "assets" / "og-banner.png"
 OUT_DIST = ROOT / "dist" / "assets" / "og-banner.png"
 W, H = 240, 126
@@ -21,14 +21,13 @@ def font(size, bold=True):
     path = "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf"
     return ImageFont.truetype(path, size)
 
-def paste_frame(dst, sheet_rel, frame_w, frame_h, frame=0, xy=(0,0), scale=1, flip=False):
-    img = Image.open(ASSETS / sheet_rel).convert("RGBA")
-    crop = img.crop((frame*frame_w, 0, frame*frame_w+frame_w, frame_h))
+def paste_asset(dst, filename, xy=(0, 0), size=None, flip=False):
+    img = Image.open(ASSETS / filename).convert("RGBA")
     if flip:
-        crop = crop.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-    if scale != 1:
-        crop = crop.resize((frame_w*scale, frame_h*scale), Image.Resampling.NEAREST)
-    dst.alpha_composite(crop, xy)
+        img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+    if size is not None:
+        img = img.resize(size, Image.Resampling.NEAREST)
+    dst.alpha_composite(img, xy)
 
 img = Image.new("RGBA", (W, H), (12, 18, 44, 255))
 d = ImageDraw.Draw(img)
@@ -83,14 +82,14 @@ small = font(6, True)
 d.text((16,59), "8-BIT PIPE PLATFORMER", font=small, fill=(244,184,72,255))
 
 # sprites from project assets
-paste_frame(img, "Main Characters/Ninja Frog/Idle (32x32).png", 32, 32, frame=3, xy=(32, 68), scale=1)
-paste_frame(img, "Main Characters/Ninja Frog/Jump (32x32).png", 32, 32, frame=0, xy=(172, 50), scale=1)
-paste_frame(img, "Items/Boxes/Box1/Idle.png", 28, 24, frame=0, xy=(73, 76), scale=1)
-paste_frame(img, "Items/Checkpoints/End/End (Idle).png", 64, 64, frame=0, xy=(196, 50), scale=1)
-# crop the oversized checkpoint into a right-edge goal element instead of letting it dominate
+paste_asset(img, "player_idle.png", xy=(32, 62), size=(38, 38))
+paste_asset(img, "player_idle.png", xy=(172, 45), size=(34, 34), flip=True)
+paste_asset(img, "shop.png", xy=(73, 74), size=(32, 28))
+paste_asset(img, "goal.png", xy=(194, 48), size=(38, 58))
+# crop the oversized goal into a right-edge goal element instead of letting it dominate
 ImageDraw.Draw(img).rectangle([226, 36, W, 118], fill=(12,18,44,255))
 for i,(x,y) in enumerate([(107,83),(126,72),(151,62),(204,78),(54,68),(223,48)]):
-    paste_frame(img, "Items/Fruits/Apple.png", 32, 32, frame=i%8, xy=(x,y), scale=1)
+    paste_asset(img, "apple.png", xy=(x, y), size=(20, 20))
 
 # NES cartridge/HUD language
 d.rectangle([158,14,225,33], fill=(12,18,44,220), outline=(188,188,188,255))
