@@ -53,7 +53,7 @@ Compared `TASK4_CHECKLIST.md` against `clicky_implementation.md` and merged the 
 | 32 | Responsive browser support | Checklist | COMPLETE | Bevy window uses `fit_canvas_to_parent: true`; live visual QA rendered fullscreen canvas | Browser smoke after push |
 | 33 | Original assets only | Checklist | COMPLETE | Gameplay references use `assets/original/*.png`; removed `assets/pixel_adventure` and unused audio files from tracked repo; generated art script committed | Keep |
 | 34 | Compile/run without errors | Checklist | COMPLETE | `cargo fmt --check`, `cargo check`, and `trunk build --release --public-url /rusty-plumber/` passed after reconciliation changes | Keep verifying before each push |
-| 35 | GitHub Pages loads directly and is playable desktop | Checklist | READY TO DEPLOY | Prior live deployment loaded and rendered game; this pass now has a clean local release build | Push/watch workflow, then smoke-test live URL |
+| 35 | GitHub Pages loads directly and is playable desktop | Checklist | COMPLETE | Pushed `e7511b4`; GitHub Pages workflow `30416112984` completed successfully; `https://syrexle.github.io/rusty-plumber/?v=e7511b4` returned HTTP 200 and browser visual QA rendered the game canvas/HUD | Keep smoke-testing after future pushes |
 
 ## Final execution order
 
@@ -63,6 +63,6 @@ Compared `TASK4_CHECKLIST.md` against `clicky_implementation.md` and merged the 
 4. Add per-level collectible count tracking and HUD display. COMPLETE.
 5. Update this unified checklist with no duplicate work. COMPLETE.
 6. Run `cargo fmt --check`, `cargo check`, and `trunk build --release --public-url /rusty-plumber/`. COMPLETE.
-7. If checks pass, commit/push and watch GitHub Pages workflow. PENDING.
-8. Smoke-test live URL with cache busting. PENDING.
+7. If checks pass, commit/push and watch GitHub Pages workflow. COMPLETE: pushed `e7511b4`, workflow `30416112984` succeeded.
+8. Smoke-test live URL with cache busting. COMPLETE: live URL returned HTTP 200 and browser visual QA rendered the game canvas/HUD.
 9. Only after funded/scope looks safe: decide whether to claim AZZLE task 4. PENDING USER DECISION.
