@@ -111,11 +111,44 @@ struct Game {
     mode: GameMode,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+impl Game {
+    fn new(mode: GameMode) -> Self {
+        Self {
+            level: 0,
+            lives: 3,
+            score: 0,
+            collectibles_total: LEVELS[0].coins.len(),
+            collectibles_remaining: LEVELS[0].coins.len(),
+            bank_coins: 0,
+            frog_coins: 0,
+            speed_boots: false,
+            spring_legs: false,
+            shield_charm: false,
+            shop_open: false,
+            shop_selected: 0,
+            shop_message: "Find the piggy shop. E opens it.".to_string(),
+            checkpoint: LEVELS[0].spawn,
+            mode,
+        }
+    }
+
+    fn reset_for_new_run(&mut self, mode: GameMode) {
+        *self = Self::new(mode);
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum GameMode {
+    Title,
     Playing,
     Won,
     Lost,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MenuAction {
+    Start,
+    Restart,
 }
 
 #[derive(Clone, Copy)]
@@ -499,23 +532,7 @@ fn main() {
 
     App::new()
         .insert_resource(ClearColor(Color::srgb(0.08, 0.1, 0.19)))
-        .insert_resource(Game {
-            level: 0,
-            lives: 3,
-            score: 0,
-            collectibles_total: LEVELS[0].coins.len(),
-            collectibles_remaining: LEVELS[0].coins.len(),
-            bank_coins: 0,
-            frog_coins: 0,
-            speed_boots: false,
-            spring_legs: false,
-            shield_charm: false,
-            shop_open: false,
-            shop_selected: 0,
-            shop_message: "Find the piggy shop. E opens it.".to_string(),
-            checkpoint: LEVELS[0].spawn,
-            mode: GameMode::Playing,
-        })
+        .insert_resource(Game::new(GameMode::Title))
         .add_plugins(
             DefaultPlugins
                 .set(WindowPlugin {
@@ -919,26 +936,32 @@ fn restart_input(
     asset_server: Res<AssetServer>,
     entities: Query<Entity, With<LevelEntity>>,
 ) {
-    if keys.just_pressed(KeyCode::KeyR) && game.mode != GameMode::Playing {
-        for e in entities.iter() {
-            commands.entity(e).despawn_recursive();
+    let start_pressed = keys.just_pressed(KeyCode::Enter)
+        || keys.just_pressed(KeyCode::NumpadEnter)
+        || keys.just_pressed(KeyCode::Space);
+    let restart_pressed = keys.just_pressed(KeyCode::KeyR);
+
+    match menu_action(game.mode, start_pressed, restart_pressed) {
+        Some(MenuAction::Start) => {
+            game.mode = GameMode::Playing;
+            play("coin");
         }
-        game.level = 0;
-        game.lives = 3;
-        game.score = 0;
-        game.collectibles_total = LEVELS[0].coins.len();
-        game.collectibles_remaining = LEVELS[0].coins.len();
-        game.bank_coins = 0;
-        game.frog_coins = 0;
-        game.speed_boots = false;
-        game.spring_legs = false;
-        game.shield_charm = false;
-        game.shop_open = false;
-        game.shop_selected = 0;
-        game.shop_message = "Find the piggy shop. E opens it.".to_string();
-        game.checkpoint = LEVELS[0].spawn;
-        game.mode = GameMode::Playing;
-        spawn_level(&mut commands, &game, &asset_server);
+        Some(MenuAction::Restart) => {
+            for e in entities.iter() {
+                commands.entity(e).despawn_recursive();
+            }
+            game.reset_for_new_run(GameMode::Playing);
+            spawn_level(&mut commands, &game, &asset_server);
+        }
+        None => {}
+    }
+}
+
+fn menu_action(mode: GameMode, start_pressed: bool, restart_pressed: bool) -> Option<MenuAction> {
+    match mode {
+        GameMode::Title if start_pressed => Some(MenuAction::Start),
+        GameMode::Won | GameMode::Lost if restart_pressed => Some(MenuAction::Restart),
+        _ => None,
     }
 }
 
@@ -1432,11 +1455,19 @@ fn update_hud(
         );
     }
     if let Ok(mut text) = banner.get_single_mut() {
-        text.sections[0].value = match game.mode {
-            GameMode::Playing => "".to_string(),
-            GameMode::Won => format!("YOU WIN! Final score: {}   Press R to restart", game.score),
-            GameMode::Lost => "GAME OVER   Press R to restart".to_string(),
-        };
+        text.sections[0].value = banner_text(&game);
+    }
+}
+
+fn banner_text(game: &Game) -> String {
+    match game.mode {
+        GameMode::Title => format!(
+            "🪠 RUSTY PLUMBER 🪠\n\nApple party platformer\n{} levels · stomp mobs · spend frog coins\n\nPress Enter / Space to start\nA/D or ←/→ move   W/Space jump   Shop with E",
+            LEVEL_COUNT
+        ),
+        GameMode::Playing => String::new(),
+        GameMode::Won => format!("YOU WIN! Final score: {}   Press R to restart", game.score),
+        GameMode::Lost => "GAME OVER   Press R to restart".to_string(),
     }
 }
 
@@ -1590,5 +1621,43 @@ mod tests {
         assert_eq!(clamped_camera_x(10_000.0, 1_500.0), 270.0);
         assert_eq!(clamped_camera_x(0.0, 1_500.0), 0.0);
         assert_eq!(clamped_camera_x(200.0, 900.0), 0.0);
+    }
+
+    #[test]
+    fn game_boots_to_title_menu_before_playing() {
+        let game = Game::new(GameMode::Title);
+
+        assert_eq!(game.mode, GameMode::Title);
+        assert_eq!(game.level, 0);
+        assert_eq!(game.lives, 3);
+        assert_eq!(game.checkpoint, LEVELS[0].spawn);
+    }
+
+    #[test]
+    fn title_menu_copy_invites_start_and_mentions_core_controls() {
+        let title = banner_text(&Game::new(GameMode::Title));
+
+        assert!(title.contains("RUSTY PLUMBER"));
+        assert!(title.contains("Press Enter / Space"));
+        assert!(title.contains("A/D"));
+        assert!(title.contains("Shop"));
+    }
+
+    #[test]
+    fn menu_input_starts_title_and_restarts_end_states() {
+        assert_eq!(
+            menu_action(GameMode::Title, true, false),
+            Some(MenuAction::Start)
+        );
+        assert_eq!(menu_action(GameMode::Title, false, true), None);
+        assert_eq!(menu_action(GameMode::Playing, true, true), None);
+        assert_eq!(
+            menu_action(GameMode::Won, false, true),
+            Some(MenuAction::Restart)
+        );
+        assert_eq!(
+            menu_action(GameMode::Lost, false, true),
+            Some(MenuAction::Restart)
+        );
     }
 }
