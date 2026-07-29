@@ -18,6 +18,15 @@
   <meta name="twitter:image" content="https://syrexle.github.io/rusty-plumber/assets/og-banner.png" />
   <title>Rusty Plumber</title>
   <link data-trunk rel="copy-dir" href="assets" />
+  <script>
+    window.__rustyPlumberErrorGuard = true;
+    window.addEventListener('error', (event) => {
+      if (!event.message && !event.error) event.preventDefault();
+    }, true);
+    window.addEventListener('unhandledrejection', (event) => {
+      if (!event.reason || event.reason.name === 'AbortError') event.preventDefault();
+    });
+  </script>
   <style>
     html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #15182e; font-family: system-ui, sans-serif; }
     canvas { display: block; width: 100vw !important; height: 100vh !important; image-rendering: pixelated; }
@@ -54,9 +63,6 @@
       osc.start(now);
       osc.stop(now + duration + 0.02);
     };
-    window.addEventListener('unhandledrejection', (event) => {
-      if (!event.reason || event.reason.name === 'AbortError') event.preventDefault();
-    });
     window.addEventListener('load',()=>setTimeout(()=>document.querySelector('.loader')?.remove(),1200));
   </script>
 </body>
