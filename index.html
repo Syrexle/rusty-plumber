@@ -32,7 +32,7 @@
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (!AudioContext) return;
       const ctx = window.__rustyPlumberAudio ??= new AudioContext();
-      if (ctx.state === 'suspended') ctx.resume();
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
       const tones = {
         jump: [520, 0.09, 'square'],
         coin: [880, 0.08, 'triangle'],
@@ -54,6 +54,9 @@
       osc.start(now);
       osc.stop(now + duration + 0.02);
     };
+    window.addEventListener('unhandledrejection', (event) => {
+      if (!event.reason || event.reason.name === 'AbortError') event.preventDefault();
+    });
     window.addEventListener('load',()=>setTimeout(()=>document.querySelector('.loader')?.remove(),1200));
   </script>
 </body>

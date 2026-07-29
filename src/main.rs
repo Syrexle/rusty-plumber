@@ -1,3 +1,5 @@
+use bevy::log::LogPlugin;
+use bevy::pbr::PbrPlugin;
 use bevy::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
@@ -20,7 +22,7 @@ const JUMP_SPEED: f32 = 720.0;
 const APPLE_BANK_VALUE: u32 = 10;
 const STOMP_FROG_COIN_REWARD: u32 = 5;
 const POWERUP_COST: u32 = 2;
-const LEVEL_COUNT: usize = 2;
+const LEVEL_COUNT: usize = 3;
 
 #[derive(Component)]
 struct Player;
@@ -65,6 +67,14 @@ struct AppleRain {
     speed: f32,
     sway: f32,
     start_x: f32,
+}
+
+#[derive(Component)]
+struct PlayerAnimation;
+
+#[derive(Component)]
+struct EnemyAnimation {
+    phase: f32,
 }
 
 #[derive(Component)]
@@ -356,9 +366,137 @@ const LEVELS: [LevelSpec; LEVEL_COUNT] = [
         shop: Vec3::new(-570.0, -182.0, 10.0),
         width: 1350.0,
     },
+    LevelSpec {
+        spawn: Vec3::new(-690.0, -185.0, 10.0),
+        platforms: &[
+            RectSpec {
+                x: -360.0,
+                y: -250.0,
+                w: 760.0,
+                h: 48.0,
+            },
+            RectSpec {
+                x: 430.0,
+                y: -250.0,
+                w: 520.0,
+                h: 48.0,
+            },
+            RectSpec {
+                x: -520.0,
+                y: -70.0,
+                w: 150.0,
+                h: 30.0,
+            },
+            RectSpec {
+                x: -235.0,
+                y: 45.0,
+                w: 145.0,
+                h: 30.0,
+            },
+            RectSpec {
+                x: 55.0,
+                y: -35.0,
+                w: 140.0,
+                h: 30.0,
+            },
+            RectSpec {
+                x: 320.0,
+                y: 95.0,
+                w: 150.0,
+                h: 30.0,
+            },
+            RectSpec {
+                x: 600.0,
+                y: 10.0,
+                w: 170.0,
+                h: 30.0,
+            },
+        ],
+        coins: &[
+            (-585.0, -20.0),
+            (-520.0, -18.0),
+            (-235.0, 95.0),
+            (-165.0, 95.0),
+            (55.0, 15.0),
+            (320.0, 145.0),
+            (600.0, 60.0),
+            (710.0, -175.0),
+        ],
+        enemies: &[
+            EnemySpec {
+                x: -540.0,
+                y: -205.0,
+                left: -640.0,
+                right: -420.0,
+                speed: 100.0,
+            },
+            EnemySpec {
+                x: -100.0,
+                y: -205.0,
+                left: -260.0,
+                right: 85.0,
+                speed: 138.0,
+            },
+            EnemySpec {
+                x: 450.0,
+                y: -205.0,
+                left: 270.0,
+                right: 655.0,
+                speed: 155.0,
+            },
+            EnemySpec {
+                x: -520.0,
+                y: -25.0,
+                left: -590.0,
+                right: -460.0,
+                speed: 80.0,
+            },
+            EnemySpec {
+                x: 315.0,
+                y: 140.0,
+                left: 255.0,
+                right: 385.0,
+                speed: 90.0,
+            },
+            EnemySpec {
+                x: 600.0,
+                y: 55.0,
+                left: 530.0,
+                right: 680.0,
+                speed: 95.0,
+            },
+        ],
+        hazards: &[
+            RectSpec {
+                x: 120.0,
+                y: -238.0,
+                w: 185.0,
+                h: 38.0,
+            },
+            RectSpec {
+                x: -350.0,
+                y: -212.0,
+                w: 80.0,
+                h: 28.0,
+            },
+            RectSpec {
+                x: 720.0,
+                y: -212.0,
+                w: 70.0,
+                h: 28.0,
+            },
+        ],
+        checkpoint: Vec3::new(300.0, 145.0, 10.0),
+        goal: Vec3::new(745.0, -180.0, 10.0),
+        shop: Vec3::new(-710.0, -182.0, 10.0),
+        width: 1500.0,
+    },
 ];
 
 fn main() {
+    #[cfg(target_arch = "wasm32")]
+    console_error_panic_hook::set_once();
+
     App::new()
         .insert_resource(ClearColor(Color::srgb(0.08, 0.1, 0.19)))
         .insert_resource(Game {
@@ -392,7 +530,9 @@ fn main() {
                     }),
                     ..default()
                 })
-                .set(ImagePlugin::default_nearest()),
+                .set(ImagePlugin::default_nearest())
+                .disable::<PbrPlugin>()
+                .disable::<LogPlugin>(),
         )
         .add_systems(Startup, setup)
         .add_systems(
@@ -408,6 +548,7 @@ fn main() {
                 enemy_player_contact,
                 hazard_goal_checkpoint,
                 animate_apple_rain,
+                animate_sprites,
                 camera_follow,
                 update_hud,
                 update_marketplace_ui,
@@ -622,6 +763,9 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
             Collider {
                 size: Vec2::new(34.0, 34.0),
             },
+            EnemyAnimation {
+                phase: i as f32 * 0.37,
+            },
             LevelEntity,
         ));
     }
@@ -692,6 +836,7 @@ fn spawn_level(commands: &mut Commands, game: &Game, asset_server: &AssetServer)
         Player,
         Velocity(Vec2::ZERO),
         Collider { size: PLAYER_SIZE },
+        PlayerAnimation,
         LevelEntity,
     ));
 }
@@ -891,7 +1036,7 @@ fn enemy_ai(
             velocity.x = -enemy.speed.abs();
         }
         sprite.flip_x = velocity.x < 0.0;
-        transform.scale.x = 1.0;
+        transform.scale.x = transform.scale.x.abs().max(1.0);
         velocity.y = 0.0;
         transform.translation.y += (time.elapsed_seconds() * 8.0 + enemy.left).sin() * 0.02;
     }
@@ -919,6 +1064,57 @@ fn animate_apple_rain(
             transform.translation.x = (transform.translation.x + 137.0)
                 .clamp(-level.width / 2.0 - 120.0, level.width / 2.0 + 120.0);
         }
+    }
+}
+
+fn animate_sprites(
+    time: Res<Time>,
+    game: Res<Game>,
+    mut players: Query<
+        (&Velocity, &mut Transform, &mut Sprite),
+        (With<PlayerAnimation>, Without<Enemy>),
+    >,
+    mut enemies: Query<
+        (&Velocity, &mut Transform, &mut Sprite, &EnemyAnimation),
+        (With<Enemy>, Without<PlayerAnimation>),
+    >,
+) {
+    if game.mode != GameMode::Playing {
+        return;
+    }
+
+    let elapsed = time.elapsed_seconds();
+    for (velocity, mut transform, mut sprite) in players.iter_mut() {
+        if velocity.x < -5.0 {
+            sprite.flip_x = true;
+        } else if velocity.x > 5.0 {
+            sprite.flip_x = false;
+        }
+
+        let run_frame = animation_frame_index(elapsed, 4, 0.11) as f32;
+        let running = velocity.x.abs() > 25.0;
+        let airborne = velocity.y.abs() > 25.0;
+        let bob = if running {
+            (run_frame - 1.5).abs() * 0.012
+        } else {
+            (elapsed * 4.0).sin() * 0.01
+        };
+        let squash = if airborne { -0.04 } else { bob };
+        transform.scale = Vec3::new(1.0 + squash * 0.45, 1.0 - squash, 1.0);
+        transform.rotation = Quat::from_rotation_z(if running {
+            velocity.x.signum() * (elapsed * 18.0).sin() * 0.035
+        } else {
+            0.0
+        });
+        sprite.custom_size = Some(PLAYER_SIZE + Vec2::new(0.0, if airborne { 3.0 } else { 0.0 }));
+    }
+
+    for (velocity, mut transform, mut sprite, anim) in enemies.iter_mut() {
+        sprite.flip_x = velocity.x < 0.0;
+        let frame = animation_frame_index(elapsed + anim.phase, 4, 0.16) as f32;
+        let bounce = (frame - 1.5).abs() * 0.025;
+        transform.scale = Vec3::new(1.0 + bounce * 0.5, 1.0 - bounce, 1.0);
+        transform.rotation = Quat::from_rotation_z((elapsed * 7.0 + anim.phase).sin() * 0.04);
     }
 }
 
@@ -1204,8 +1400,7 @@ fn camera_follow(
     let Ok(mut ct) = camera.get_single_mut() else {
         return;
     };
-    let half = LEVELS[game.level].width / 2.0;
-    let target_x = pt.translation.x.clamp(-half + 480.0, half - 480.0);
+    let target_x = clamped_camera_x(pt.translation.x, LEVELS[game.level].width);
     ct.translation.x = ct.translation.x + (target_x - ct.translation.x) * 0.12;
     ct.translation.y = ct.translation.y
         + ((pt.translation.y + 80.0).clamp(-60.0, 165.0) - ct.translation.y) * 0.08;
@@ -1321,10 +1516,79 @@ fn overlap(a_pos: Vec3, a_size: Vec2, b_pos: Vec3, b_size: Vec2) -> Option<Vec2>
     Some(Vec2::new(px, py))
 }
 
+fn animation_frame_index(
+    elapsed_seconds: f32,
+    frame_count: usize,
+    seconds_per_frame: f32,
+) -> usize {
+    if frame_count == 0 || seconds_per_frame <= 0.0 {
+        return 0;
+    }
+    ((elapsed_seconds / seconds_per_frame).floor() as usize) % frame_count
+}
+
+fn clamped_camera_x(player_x: f32, level_width: f32) -> f32 {
+    let min = -level_width / 2.0 + 480.0;
+    let max = level_width / 2.0 - 480.0;
+    if min >= max {
+        0.0
+    } else {
+        player_x.clamp(min, max)
+    }
+}
+
 fn play(name: &str) {
     #[cfg(target_arch = "wasm32")]
     azzle_play_sound(name);
 
     #[cfg(not(target_arch = "wasm32"))]
     let _ = name;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ships_at_least_three_distinct_playable_levels() {
+        assert_eq!(LEVEL_COUNT, 3);
+        assert_eq!(LEVELS.len(), 3);
+
+        for (index, level) in LEVELS.iter().enumerate() {
+            assert!(
+                level.platforms.len() >= 5,
+                "level {index} needs platform depth"
+            );
+            assert!(
+                level.coins.len() >= 7,
+                "level {index} needs collectible route"
+            );
+            assert!(
+                level.enemies.len() >= 5,
+                "level {index} needs multiple enemies"
+            );
+            assert!(level.hazards.len() >= 2, "level {index} needs hazards");
+            assert!(level.width >= 1_100.0, "level {index} needs camera room");
+            assert_ne!(
+                level.spawn, level.checkpoint,
+                "level {index} checkpoint must advance respawn"
+            );
+        }
+    }
+
+    #[test]
+    fn animation_frames_advance_and_loop_without_transform_flips() {
+        assert_eq!(animation_frame_index(0.0, 4, 0.12), 0);
+        assert_eq!(animation_frame_index(0.13, 4, 0.12), 1);
+        assert_eq!(animation_frame_index(0.49, 4, 0.12), 0);
+        assert_eq!(animation_frame_index(1.01, 3, 0.18), 2);
+    }
+
+    #[test]
+    fn camera_clamp_keeps_wide_levels_inside_bounds() {
+        assert_eq!(clamped_camera_x(-10_000.0, 1_500.0), -270.0);
+        assert_eq!(clamped_camera_x(10_000.0, 1_500.0), 270.0);
+        assert_eq!(clamped_camera_x(0.0, 1_500.0), 0.0);
+        assert_eq!(clamped_camera_x(200.0, 900.0), 0.0);
+    }
 }

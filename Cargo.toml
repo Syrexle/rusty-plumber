@@ -11,6 +11,7 @@ bevy = { version = "0.14", default-features = true, features = ["webgl2"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 uuid = { version = "1", features = ["js"] }
 wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
 
 [profile.dev]
 opt-level = 1

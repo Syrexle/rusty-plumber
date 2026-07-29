@@ -36,13 +36,14 @@ Compared `TASK4_CHECKLIST.md` against `clicky_implementation.md` and merged the 
 | 15 | Track per-level collectible counts | Brief item 3 | COMPLETE | Added `collectibles_total` / `collectibles_remaining`, reset on restart and level transition, decremented on pickup, displayed in HUD | Done in this pass |
 | 16 | Multiple enemies with simple patrol AI | Checklist / brief context | COMPLETE | `LevelSpec.enemies`; `enemy_ai` patrols between left/right bounds | Keep |
 | 17 | Fix enemy left-facing flat/invisible sprite bug | Brief item 1 | COMPLETE | `enemy_ai` now sets `Sprite::flip_x` and keeps `Transform.scale.x = 1.0` instead of near-zero/negative transform scale | Done in this pass |
+| 17a | Better player/enemy animations | Polish pass | COMPLETE | Added procedural player squash/bob/tilt/facing animation and enemy bounce/tilt/facing animation via `animate_sprites`, `PlayerAnimation`, and `EnemyAnimation` | Done in polish pass |
 | 18 | Hazards | Checklist | COMPLETE | `LevelSpec.hazards`; `hazard_goal_checkpoint` damages on overlap; falling below threshold damages | Keep |
 | 19 | Smooth clamped camera follow | Checklist / brief item 2 | COMPLETE | `camera_follow` lerps toward player and clamps x/y to level/canvas bounds | Keep |
 | 20 | Sound effects | Checklist / brief context | COMPLETE | WASM `azzlePlaySound` bridge supports jump/coin/hurt/checkpoint/win/stomp runtime sounds | Browser QA optional |
 | 21 | Score | Checklist / brief context | COMPLETE | Score increments on collectibles, stomp, checkpoint, goal | Keep |
 | 22 | Lives | Checklist / brief context | COMPLETE | `damage_player` decrements lives; `GameMode::Lost` at zero | Keep |
 | 23 | HUD | Checklist | COMPLETE | HUD displays level, score, lives, apple count, bank coins, frog coins, controls, owned powerups | Done in this pass for apple count |
-| 24 | Data-driven multiple levels | Checklist / brief item 4 | COMPLETE | `LEVELS` contains two distinct `LevelSpec` layouts: platforms, enemies, collectibles, hazards, checkpoint, start, goal, shop, width | Keep |
+| 24 | Data-driven multiple levels | Checklist / brief item 4 | COMPLETE | `LEVELS` contains three distinct `LevelSpec` layouts: platforms, enemies, collectibles, hazards, checkpoint, start, goal, shop, width | Keep |
 | 25 | Level loader / transition | Brief item 4 | COMPLETE | Reaching goal despawns `LevelEntity`, increments `game.level`, resets checkpoint and collectible counts, then calls `spawn_level` | Keep |
 | 26 | Checkpoint entities | Checklist / brief item 5 | COMPLETE | `Checkpoint { position }` entity spawned per level from `LevelSpec.checkpoint` | Keep |
 | 27 | Death respawns at latest checkpoint | Brief item 5 | COMPLETE | `hazard_goal_checkpoint` updates `game.checkpoint`; `damage_player` respawns at `game.checkpoint` while lives remain | Keep |
@@ -54,6 +55,7 @@ Compared `TASK4_CHECKLIST.md` against `clicky_implementation.md` and merged the 
 | 33 | Original assets only | Checklist | COMPLETE | Gameplay references use `assets/original/*.png`; removed `assets/pixel_adventure` and unused audio files from tracked repo; generated art script committed | Keep |
 | 34 | Compile/run without errors | Checklist | COMPLETE | `cargo fmt --check`, `cargo check`, and `trunk build --release --public-url /rusty-plumber/` passed after reconciliation changes | Keep verifying before each push |
 | 35 | GitHub Pages loads directly and is playable desktop | Checklist | COMPLETE | Pushed `e7511b4`; GitHub Pages workflow `30416112984` completed successfully; `https://syrexle.github.io/rusty-plumber/?v=e7511b4` returned HTTP 200 and browser visual QA rendered the game canvas/HUD | Keep smoke-testing after future pushes |
+| 36 | Cleaner browser console | Polish pass | COMPLETE LOCALLY | Disabled unused Bevy PBR and runtime logging plugins, installed wasm panic hook, and hardened WebAudio resume promise handling | Verify live after push |
 
 ## Final execution order
 
